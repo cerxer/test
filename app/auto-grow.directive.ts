@@ -18,7 +18,7 @@ export class AutoGrowDirective{
     
     onFocus(){
         this.renderer.setElementStyle(this.el,'background-color','red');
-        this.renderer.setText(this.el,"afadsg");
+        this.renderer.setText(this.el,"afsg");
     }
     
     onBlur(){
