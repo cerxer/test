@@ -73,7 +73,8 @@ export class Hand {
       const m = new THREE.MeshLambertMaterial({ map: this.iconTexture(id), alphaTest: 0.5, side: THREE.DoubleSide });
       this.materials = [m];
       mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.4), m);
-      this.base = { x: 0.44, y: -0.3, z: -0.72, rx: 0.05, ry: -1.05, rz: 0.3 };
+      mesh.scale.x = -1; // mirror so tools point up-left like a right-hand grip
+      this.base = { x: 0.42, y: -0.31, z: -0.68, rx: 0, ry: -0.5, rz: 0 };
     }
     this.mesh = mesh;
     this.holder.add(mesh);

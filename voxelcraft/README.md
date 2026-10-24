@@ -6,7 +6,12 @@ Built with HTML5, CSS3, JavaScript (ES modules), Three.js and WebGL2. No backend
 step and no external downloads: every texture, icon and sound is generated procedurally at
 startup, and Three.js is vendored in `lib/`.
 
-![Exploring a beach at the edge of a forest](docs/screenshot-world.png)
+![Exploring a beach at the edge of a forest](docs/screenshot-world.jpg)
+
+| | |
+| --- | --- |
+| ![All eight creatures](docs/screenshot-mobs.jpg) | ![Sunset over snow-capped mountains](docs/screenshot-sunset.jpg) |
+| ![Crafting a stone pickaxe at a crafting table](docs/screenshot-crafting.jpg) | |
 
 ## Running locally
 
@@ -127,6 +132,7 @@ voxelcraft/
 ├── server.js             Zero-dependency static file server
 ├── lib/                  Three.js r170 (vendored, MIT licence)
 ├── tests/run.mjs         Headless unit tests (Node)
+├── docs/                 Screenshots
 └── js/
     ├── main.js           Game class: state machine, main loop, saving, explosions
     ├── settings.js       Persistent settings + settings screen schema
