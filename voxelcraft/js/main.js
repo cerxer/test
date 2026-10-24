@@ -10,6 +10,7 @@ import { BIOME_NAMES } from './engine/terrain.js';
 import { hashString } from './engine/noise.js';
 import { buildItemIcons, buildHudIcons, itemDef, maxStack } from './game/items.js';
 import { Player } from './game/player.js';
+import { Inventory } from './game/inventory.js';
 import { Input } from './game/input.js';
 import { Interaction } from './game/interaction.js';
 import { EntityManager } from './game/entities.js';
@@ -110,8 +111,8 @@ class Game {
     window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 200));
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.state === 'game') {
-        this.saveGame();
-        if (!this.overlay) this.pause();
+        if (!this.overlay || this.overlay === 'inventory') this.pause();
+        else this.saveGame();
       }
     });
     window.addEventListener('pagehide', () => this.saveGame());
@@ -149,6 +150,16 @@ class Game {
   // ---------- world lifecycle ----------
 
   async createWorld({ name, seedText, mode }) {
+    if (this.starting) return;
+    this.starting = true;
+    try {
+      await this.createWorldInner({ name, seedText, mode });
+    } finally {
+      this.starting = false;
+    }
+  }
+
+  async createWorldInner({ name, seedText, mode }) {
     const st = (seedText || '').trim();
     let seed;
     if (!st) seed = Math.floor(Math.random() * 2147483647);
@@ -164,8 +175,14 @@ class Game {
   }
 
   async loadWorld(id) {
-    const meta = await this.storage.getWorld(id);
-    if (meta) await this.startWorld(meta);
+    if (this.starting) return;
+    this.starting = true;
+    try {
+      const meta = await this.storage.getWorld(id);
+      if (meta) await this.startWorld(meta);
+    } finally {
+      this.starting = false;
+    }
   }
 
   async startWorld(meta) {
@@ -269,8 +286,14 @@ class Game {
     p.spawn.copy(p.pos);
   }
 
+  // Lift the player out of solid blocks. If their column isn't loaded yet, retry once it is.
   ensurePlayerSafe() {
-    const p = this.player;
+    const p = this.player, w = this.world;
+    if (!w || !w.isRendered(Math.floor(p.pos.x), Math.floor(p.pos.z))) {
+      this.safetyPending = true;
+      return;
+    }
+    this.safetyPending = false;
     for (let i = 0; i < 130 && p.isStuck(); i++) p.pos.y += 1;
   }
 
@@ -286,6 +309,13 @@ class Game {
     if (!this.world || !this.worldMeta || this.state !== 'game') return;
     const meta = this.worldMeta;
     meta.player = this.player.serialize();
+    const pending = this.invUI.pendingStacks();
+    if (pending.length) {
+      const inv = new Inventory();
+      inv.load(meta.player.inventory);
+      for (const s of pending) inv.add(s.id, s.count, s.dur);
+      meta.player.inventory = inv.serialize();
+    }
     meta.mode = this.player.mode;
     meta.time = this.time;
     meta.furnaces = this.furnaces.serialize();
@@ -419,11 +449,11 @@ class Game {
 
   onPlayerDeath(source) {
     const p = this.player, inv = p.inventory;
+    if (this.invUI.isOpen) this.invUI.close();
     if (!p.creative) {
       for (const s of inv.slots) if (s) this.entities.spawnItem(p.pos.x, p.pos.y + 1, p.pos.z, s.id, s.count, s.dur, 1);
       inv.clear();
     }
-    if (this.overlay === 'inventory') this.invUI.close();
     this.overlay = 'dead';
     this.expectUnlock = this.input.locked;
     this.input.exitLock();
@@ -580,6 +610,8 @@ class Game {
       this.updateUniforms();
       return;
     }
+
+    if (this.safetyPending) this.ensurePlayerSafe();
 
     const t = this.input.touch;
     if (t.tap) {

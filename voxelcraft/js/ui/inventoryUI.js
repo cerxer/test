@@ -75,6 +75,14 @@ export class InventoryUI {
     this.tooltip.classList.add('hidden');
   }
 
+  // Stacks currently held in the crafting grid or on the cursor (not yet in the inventory).
+  pendingStacks() {
+    if (!this.isOpen) return [];
+    const list = this.craft.filter(Boolean);
+    if (this.cursor) list.push(this.cursor);
+    return list;
+  }
+
   giveBack(stack) {
     const left = this.game.player.inventory.add(stack.id, stack.count, stack.dur);
     if (left > 0) this.game.dropStack(Object.assign({}, stack, { count: left }));

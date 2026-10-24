@@ -69,6 +69,7 @@ export class World {
     scene.add(this.group);
     this.savedKeys = savedKeys || new Set();
     this.dirtySave = new Set();
+    this.unsaved = new Map(); // unloaded chunks whose save has not succeeded yet: "cx,cz" -> { cx, cz, blocks }
     this.urgent = new Set();
     this.renderDistance = 6;
     this.time = 0;
@@ -150,7 +151,15 @@ export class World {
         this.chunks.set(key, c);
       }
       if (c.state === NEW) {
-        if (this.savedKeys.has(cx + ',' + cz)) { this.loadFromDB(c); continue; }
+        const k = cx + ',' + cz;
+        const pending = this.unsaved.get(k);
+        if (pending) {
+          this.unsaved.delete(k);
+          this.onChunkData(c, pending.blocks, false);
+          this.dirtySave.add(c);
+          continue;
+        }
+        if (this.savedKeys.has(k)) { this.loadFromDB(c); continue; }
         return { kind: 'gen', chunk: c };
       }
       if (c.state !== READY) continue;
@@ -295,13 +304,22 @@ export class World {
       const dx = c.cx - pcx, dz = c.cz - pcz;
       if (dx * dx + dz * dz <= r2) continue;
       if (this.dirtySave.has(c)) {
-        toSave.push({ cx: c.cx, cz: c.cz, blocks: c.blocks });
-        this.savedKeys.add(c.cx + ',' + c.cz);
+        const rec = { cx: c.cx, cz: c.cz, blocks: c.blocks };
+        this.unsaved.set(rec.cx + ',' + rec.cz, rec);
+        toSave.push(rec);
         this.dirtySave.delete(c);
       }
       this.disposeChunk(c);
     }
-    if (toSave.length) this.storage.putChunks(this.worldId, toSave).catch((e) => console.error('Save failed', e));
+    if (!toSave.length) return;
+    // Keep the data in `unsaved` until the write succeeds so a failed save is retried later.
+    this.storage.putChunks(this.worldId, toSave).then(() => {
+      for (const rec of toSave) {
+        const k = rec.cx + ',' + rec.cz;
+        this.savedKeys.add(k);
+        if (this.unsaved.get(k) === rec) this.unsaved.delete(k);
+      }
+    }).catch((e) => console.error('Save failed', e));
   }
 
   disposeChunk(c) {
@@ -438,7 +456,8 @@ export class World {
   // ---------- raycasting ----------
 
   // Amanatides & Woo voxel traversal. Returns { x, y, z, id, nx, ny, nz, dist } or null.
-  raycast(origin, dir, maxDist) {
+  // With solidOnly, only collidable blocks stop the ray (used for line of sight and arrows).
+  raycast(origin, dir, maxDist, solidOnly = false) {
     let x = Math.floor(origin.x), y = Math.floor(origin.y), z = Math.floor(origin.z);
     const dx = dir.x, dy = dir.y, dz = dir.z;
     const stepX = dx > 0 ? 1 : -1, stepY = dy > 0 ? 1 : -1, stepZ = dz > 0 ? 1 : -1;
@@ -452,7 +471,7 @@ export class World {
     for (let i = 0; i < 256 && t <= maxDist; i++) {
       const id = this.getBlock(x, y, z);
       if (id === B.UNLOADED) return null;
-      if (BLOCK_TARGETABLE[id]) {
+      if (solidOnly ? BLOCK_SOLID[id] : BLOCK_TARGETABLE[id]) {
         const shape = BLOCK_SHAPE[id];
         if (shape === SHAPE.CUBE) return { x, y, z, id, nx, ny, nz, dist: t };
         const hit = rayBox(origin, dir, x, y, z, shapeBox(id));
@@ -470,14 +489,26 @@ export class World {
   // ---------- persistence ----------
 
   async saveDirty() {
-    if (!this.dirtySave.size) return;
-    const list = [];
-    for (const c of this.dirtySave) {
-      list.push({ cx: c.cx, cz: c.cz, blocks: c.blocks });
-      this.savedKeys.add(c.cx + ',' + c.cz);
-    }
+    if (!this.dirtySave.size && !this.unsaved.size) return;
+    const chunks = [...this.dirtySave];
+    const recs = [...this.unsaved.values()];
+    const list = chunks.map((c) => ({ cx: c.cx, cz: c.cz, blocks: c.blocks })).concat(recs);
     this.dirtySave.clear();
-    await this.storage.putChunks(this.worldId, list);
+    try {
+      await this.storage.putChunks(this.worldId, list);
+    } catch (e) {
+      // Re-queue everything so the next save retries it.
+      for (const c of chunks) {
+        if (this.chunks.get(c.key) === c) this.dirtySave.add(c);
+        else this.unsaved.set(c.cx + ',' + c.cz, { cx: c.cx, cz: c.cz, blocks: c.blocks });
+      }
+      throw e;
+    }
+    for (const r of list) this.savedKeys.add(r.cx + ',' + r.cz);
+    for (const r of recs) {
+      const k = r.cx + ',' + r.cz;
+      if (this.unsaved.get(k) === r) this.unsaved.delete(k);
+    }
   }
 
   // Fraction of chunks within radius r (in chunks) around a position that have meshes.

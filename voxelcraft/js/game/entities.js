@@ -113,8 +113,8 @@ class Mob {
     const dir = target.clone().sub(eye);
     const dist = dir.length();
     dir.divideScalar(dist || 1);
-    const hit = g.world.raycast(eye.clone(), dir, dist);
-    return !hit || hit.dist >= dist - 0.3 || !BLOCK_SOLID[hit.id];
+    const hit = g.world.raycast(eye.clone(), dir, dist, true);
+    return !hit || hit.dist >= dist - 0.3;
   }
 
   update(dt) {
@@ -168,8 +168,8 @@ class Mob {
         }
         if (dist > 7) this.fuse = 0;
         if (this.fuse >= 1.5) {
+          this.deathTime = 1; // mark dead first so the blast doesn't kill it again (and drop loot)
           g.explode(this.pos.x, this.pos.y + 0.8, this.pos.z, 3.2);
-          this.deathTime = 1;
           return false;
         }
       } else {
@@ -205,6 +205,8 @@ class Mob {
       }
       speed *= this.spec.hostile ? 0.5 : 0.7;
     }
+
+    if (this.type === 'creeper' && !canTarget) this.fuse = Math.max(0, this.fuse - dt * 1.5);
 
     let len = Math.hypot(mx, mz);
     if (len > 0.001) {
@@ -548,8 +550,8 @@ class Arrow {
         return false;
       }
     }
-    const bhit = g.world.raycast(this.pos, dir, step);
-    if (bhit && BLOCK_SOLID[bhit.id]) {
+    const bhit = g.world.raycast(this.pos, dir, step, true);
+    if (bhit) {
       this.pos.addScaledVector(dir, bhit.dist);
       this.stuck = true;
       this.life = 0;
