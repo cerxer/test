@@ -1,0 +1,12 @@
+{
+  "name": "voxelcraft",
+  "version": "1.0.0",
+  "description": "A Minecraft-style voxel sandbox game that runs in the browser (Three.js + WebGL).",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node tests/run.mjs"
+  },
+  "license": "MIT"
+}

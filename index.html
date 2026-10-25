@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1d1a17">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="description" content="VoxelCraft - a Minecraft-style voxel sandbox game in your browser.">
+  <title>VoxelCraft</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 fill=%22%23866043%22/%3E%3Crect width=%2216%22 height=%225%22 fill=%22%235c9e36%22/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="crosshair"></div>
+    <div id="damage-flash"></div>
+    <div id="water-overlay"></div>
+    <div id="debug" class="hidden"></div>
+    <div id="fps" class="hidden"></div>
+    <div id="toast"></div>
+    <div id="item-name"></div>
+    <div id="bottom-hud">
+      <div id="status-row">
+        <div id="hearts" class="icon-row"></div>
+        <div id="right-stats">
+          <div id="bubbles" class="icon-row"></div>
+          <div id="hunger" class="icon-row"></div>
+        </div>
+      </div>
+      <div id="hotbar"></div>
+    </div>
+    <div id="click-to-play" class="hidden"><div class="ctp-box">Click to play</div></div>
+  </div>
+
+  <div id="touch-ui" class="hidden">
+    <div id="touch-look"></div>
+    <div id="joystick"><div id="joystick-knob"></div></div>
+    <button class="tbtn big" id="t-jump" aria-label="Jump"><svg viewBox="0 0 24 24"><path d="M12 4l7 8h-4v8H9v-8H5z"/></svg></button>
+    <button class="tbtn" id="t-break" aria-label="Break"><svg viewBox="0 0 24 24"><path d="M4 7c4-4 12-4 16 0l-2 1c-1-1-3-2-5-2l-7 14-2-1 7-13c-2 0-4 1-5 2z"/></svg></button>
+    <button class="tbtn" id="t-place" aria-label="Place / Use"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 5.3L6.2 8.5 12 11.7l5.8-3.2z"/></svg></button>
+    <button class="tbtn" id="t-sneak" aria-label="Sneak"><svg viewBox="0 0 24 24"><path d="M12 20l-7-8h4V4h6v8h4z"/></svg></button>
+    <button class="tbtn small" id="t-inv" aria-label="Inventory"><svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg></button>
+    <button class="tbtn small" id="t-pause" aria-label="Pause"><svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
+    <button class="tbtn small" id="t-drop" aria-label="Drop item"><svg viewBox="0 0 24 24"><path d="M12 3v11l4-4 1.4 1.4L12 17l-5.4-5.6L8 10l4 4V3zM5 19h14v2H5z"/></svg></button>
+    <button class="tbtn small hidden" id="t-fly" aria-label="Toggle flying"><svg viewBox="0 0 24 24"><path d="M2 12c4-1 7-4 10-8 3 4 6 7 10 8-4 1-7 3-10 8-3-5-6-7-10-8z"/></svg></button>
+  </div>
+
+  <div id="screens">
+    <div class="screen menu-bg" id="screen-main">
+      <div class="title-block">
+        <h1 class="logo">VOXELCRAFT</h1>
+        <div class="splash">Mine! Build! Survive!</div>
+      </div>
+      <div class="menu-buttons">
+        <button class="mc-btn" data-action="play">Play</button>
+        <button class="mc-btn" data-action="create">Create World</button>
+        <div class="btn-row">
+          <button class="mc-btn" data-action="settings">Settings</button>
+          <button class="mc-btn" data-action="help">How to Play</button>
+        </div>
+      </div>
+      <div class="footer"><span id="storage-status"></span><span>VoxelCraft 1.0</span></div>
+    </div>
+
+    <div class="screen menu-bg hidden" id="screen-worlds">
+      <h2>Select World</h2>
+      <div id="world-list" class="list-box"></div>
+      <div class="btn-row">
+        <button class="mc-btn" data-action="play-selected">Play Selected World</button>
+        <button class="mc-btn" data-action="create">Create New World</button>
+      </div>
+      <div class="btn-row">
+        <button class="mc-btn" data-action="delete-selected">Delete</button>
+        <button class="mc-btn" data-action="back-main">Cancel</button>
+      </div>
+    </div>
+
+    <div class="screen menu-bg hidden" id="screen-create">
+      <h2>Create New World</h2>
+      <div class="form">
+        <label for="world-name">World Name</label>
+        <input id="world-name" class="mc-input" maxlength="32" value="New World" autocomplete="off">
+        <label for="world-seed">Seed for the World Generator <span class="hint">(leave blank for a random seed)</span></label>
+        <input id="world-seed" class="mc-input" maxlength="40" placeholder="Random" autocomplete="off">
+        <label>Game Mode</label>
+        <button class="mc-btn" id="mode-toggle" data-action="toggle-mode">Game Mode: Survival</button>
+        <p class="hint" id="mode-desc">Search for resources, craft, gain health and hunger.</p>
+      </div>
+      <div class="btn-row">
+        <button class="mc-btn" data-action="create-confirm">Create New World</button>
+        <button class="mc-btn" data-action="back-worlds">Cancel</button>
+      </div>
+    </div>
+
+    <div class="screen menu-bg hidden" id="screen-settings">
+      <h2>Settings</h2>
+      <div id="settings-list" class="settings-grid"></div>
+      <button class="mc-btn wide" data-action="settings-done">Done</button>
+    </div>
+
+    <div class="screen menu-bg hidden" id="screen-help">
+      <h2>How to Play</h2>
+      <div class="help-cols">
+        <div class="help-box">
+          <h3>Keyboard &amp; Mouse</h3>
+          <table>
+            <tr><td>W A S D</td><td>Move</td></tr>
+            <tr><td>Mouse</td><td>Look around</td></tr>
+            <tr><td>Space</td><td>Jump / swim up (double-tap: fly in Creative)</td></tr>
+            <tr><td>Shift</td><td>Sprint (or double-tap W)</td></tr>
+            <tr><td>Ctrl / C</td><td>Crouch (won't fall off edges) / fly down</td></tr>
+            <tr><td>Left click (hold)</td><td>Break blocks / attack</td></tr>
+            <tr><td>Right click</td><td>Place block / use / eat (hold)</td></tr>
+            <tr><td>Middle click</td><td>Pick block</td></tr>
+            <tr><td>E</td><td>Inventory &amp; crafting</td></tr>
+            <tr><td>1–9 / wheel</td><td>Select hotbar slot</td></tr>
+            <tr><td>Q</td><td>Drop item (Ctrl+Q: whole stack)</td></tr>
+            <tr><td>F3</td><td>Debug info</td></tr>
+            <tr><td>Esc</td><td>Pause</td></tr>
+          </table>
+        </div>
+        <div class="help-box">
+          <h3>Touch</h3>
+          <table>
+            <tr><td>Left stick</td><td>Move (push to the edge to sprint)</td></tr>
+            <tr><td>Drag right side</td><td>Look around</td></tr>
+            <tr><td>Tap screen</td><td>Place / use</td></tr>
+            <tr><td>Hold screen</td><td>Break / attack</td></tr>
+            <tr><td>Buttons</td><td>Jump, break, place, sneak, inventory</td></tr>
+          </table>
+          <h3>Getting started</h3>
+          <p>Punch a tree to collect logs, turn them into planks and sticks in your inventory (E), build a crafting table and make a wooden pickaxe. Mine stone for better tools, smelt iron ore in a furnace and place torches before night falls — monsters spawn in the dark!</p>
+          <p>Inventory: click to pick up / place, right-click to split, shift-click (or double-click) to quick-move, drag to move.</p>
+        </div>
+      </div>
+      <button class="mc-btn wide" data-action="back-main">Done</button>
+    </div>
+
+    <div class="screen overlay hidden" id="screen-pause">
+      <h2>Game Menu</h2>
+      <div class="menu-buttons">
+        <button class="mc-btn" data-action="resume">Back to Game</button>
+        <button class="mc-btn" data-action="settings">Settings</button>
+        <button class="mc-btn" id="pause-mode" data-action="switch-mode">Game Mode: Survival</button>
+        <button class="mc-btn" data-action="save-quit">Save and Quit to Title</button>
+      </div>
+      <p class="hint" id="pause-info"></p>
+    </div>
+
+    <div class="screen overlay red hidden" id="screen-dead">
+      <h1 class="death-title">You Died!</h1>
+      <p id="death-msg"></p>
+      <div class="menu-buttons">
+        <button class="mc-btn" data-action="respawn">Respawn</button>
+        <button class="mc-btn" data-action="save-quit">Title Screen</button>
+      </div>
+    </div>
+
+    <div class="screen menu-bg hidden" id="screen-loading">
+      <h2 id="loading-title">Generating World</h2>
+      <div class="progress"><div id="loading-bar"></div></div>
+      <p id="loading-detail" class="hint"></p>
+    </div>
+
+    <div class="screen overlay hidden" id="screen-inventory">
+      <div id="inv-panel" class="panel"></div>
+    </div>
+
+    <div class="screen overlay hidden" id="screen-confirm">
+      <h2 id="confirm-title">Are you sure?</h2>
+      <p id="confirm-text"></p>
+      <div class="btn-row">
+        <button class="mc-btn" id="confirm-yes">Delete</button>
+        <button class="mc-btn" id="confirm-no">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cursor-item" class="hidden"></div>
+  <div id="tooltip" class="hidden"></div>
+  <div id="rotate-hint" class="hidden">Rotate your device to landscape for the best experience <button id="rotate-dismiss">OK</button></div>
+  <div id="fatal" class="hidden"></div>
+  <noscript><div class="noscript">VoxelCraft needs JavaScript enabled.</div></noscript>
+  <script>
+    // Friendly diagnostics when the module graph cannot load (e.g. opened via file://).
+    (function () {
+      function fail(msg) {
+        var el = document.getElementById('fatal');
+        el.textContent = msg;
+        el.className = '';
+      }
+      if (location.protocol === 'file:') {
+        fail('VoxelCraft must be served over http(s) because browsers block ES modules and Web Workers on file:// URLs.\n\n' +
+          'Start a local server in the voxelcraft folder, for example:\n\n  node server.js\n  (or) python3 -m http.server 8080\n\nthen open http://localhost:8080');
+        return;
+      }
+      setTimeout(function () {
+        if (!window.__voxelcraftStarted) fail('VoxelCraft failed to start. Your browser may not support JavaScript modules, or a file failed to load. Check the browser console for details.');
+      }, 8000);
+    })();
+  </script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
